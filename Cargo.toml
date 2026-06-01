@@ -1,0 +1,45 @@
+# decodingus-shared — crates shared between the DecodingUs AppView (server) and
+# the Navigator edge app. Extracted from the decodingus repo so fixes flow both
+# ways. Pure, IO-light, no server/web coupling.
+[workspace]
+resolver = "2"
+members = [
+    "crates/du-domain",
+    "crates/du-atproto",
+    "crates/du-bio",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+license = "BSD-3-Clause"
+repository = "https://github.com/decodingus/decodingus-shared"
+
+[workspace.dependencies]
+# Internal (within this shared workspace)
+du-domain = { path = "crates/du-domain" }
+
+# Common types / serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = "1"
+thiserror = "2"
+
+# HTTP (AT Protocol resolution / OAuth discovery)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# AT Protocol identity/crypto
+ed25519-dalek = "2"
+multibase = "0.9"
+base64 = "0.22"
+sha2 = "0.10"
+p256 = { version = "0.13", features = ["ecdsa"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
