@@ -12,6 +12,7 @@ pub mod error;
 pub mod genome_region;
 pub mod haplogroup;
 pub mod ids;
+pub mod merge;
 pub mod publication;
 pub mod variant;
 
