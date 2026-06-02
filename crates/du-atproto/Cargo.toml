@@ -19,3 +19,7 @@ reqwest = { workspace = true }
 sha2 = { workspace = true }
 p256 = { workspace = true }
 rand_core = { workspace = true }
+
+[dev-dependencies]
+# Live PDS handshake integration test (gated on PDS_TEST_URL).
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
