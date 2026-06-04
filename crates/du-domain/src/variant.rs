@@ -11,15 +11,20 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// A coordinate of a variant on one reference build.
+///
+/// Alleles are **ancestral/derived** (the phylogenetic mutation), NOT the assembly
+/// reference/alternate: the reference genome is not genetic Adam, so its allele does
+/// not map to the ancestral state. (`reference_allele`/`alternate_allele` aliases are
+/// accepted on read for pre-rename JSONB.)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildCoordinate {
     /// Contig/accession on this build (e.g. "chrY", "CM000686.2").
     pub contig: String,
     pub position: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub reference_allele: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub alternate_allele: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "reference_allele")]
+    pub ancestral: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "alternate_allele")]
+    pub derived: Option<String>,
 }
 
 /// `core.variant.coordinates` JSONB — keyed by reference build.
@@ -93,8 +98,8 @@ mod tests {
             BuildCoordinate {
                 contig: "chrY".into(),
                 position: 2_787_319,
-                reference_allele: Some("C".into()),
-                alternate_allele: Some("T".into()),
+                ancestral: Some("C".into()),
+                derived: Some("T".into()),
             },
         );
         let json = serde_json::to_value(&c).unwrap();

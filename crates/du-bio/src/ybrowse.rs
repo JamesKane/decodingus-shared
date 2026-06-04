@@ -51,8 +51,9 @@ pub fn from_grch38_vcf(records: &[VcfVariant], targets: &[LiftTarget]) -> Ingest
             BuildCoordinate {
                 contig: r.chrom.clone(),
                 position: r.pos,
-                reference_allele: Some(r.reference.clone()),
-                alternate_allele: alt.clone(),
+                // YBrowse VCF encodes ancestral as REF, derived as ALT.
+                ancestral: Some(r.reference.clone()),
+                derived: alt.clone(),
             },
         );
         for t in targets {
@@ -62,8 +63,8 @@ pub fn from_grch38_vcf(records: &[VcfVariant], targets: &[LiftTarget]) -> Ingest
                     BuildCoordinate {
                         contig,
                         position,
-                        reference_allele: Some(r.reference.clone()),
-                        alternate_allele: alt.clone(),
+                        ancestral: Some(r.reference.clone()),
+                        derived: alt.clone(),
                     },
                 ),
                 None => out.unmapped_lifts += 1,
