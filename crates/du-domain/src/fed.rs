@@ -404,6 +404,11 @@ pub struct PopulationBreakdownRecord {
     pub snps_with_genotype: i64,
     pub snps_missing: i64,
     pub confidence_level: WireF64,
+    /// Fit residual for distance-minimizing models (nMonte/G25-style) — the Euclidean
+    /// distance between the sample and its fitted mixture in PC space. Lower is better;
+    /// `None` for non-fit methods (admixture, AF-likelihood, GMM classification).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fit_distance: Option<WireF64>,
     #[serde(default)]
     pub components: Vec<PopulationComponent>,
     #[serde(default)]
@@ -438,6 +443,7 @@ impl PopulationBreakdownRecord {
             snps_with_genotype,
             snps_missing,
             confidence_level: confidence_level.into(),
+            fit_distance: None,
             components,
             super_population_summary,
             pca_coordinates: pca_coordinates.map(|v| v.into_iter().map(WireF64).collect()),
@@ -448,6 +454,17 @@ impl PopulationBreakdownRecord {
     pub fn with_biosample_ref(mut self, biosample_ref: Option<String>) -> Self {
         self.biosample_ref = biosample_ref;
         self
+    }
+
+    /// Attach the distance-model fit residual (nMonte/G25). `None` leaves it unset.
+    pub fn with_fit_distance(mut self, fit_distance: Option<f64>) -> Self {
+        self.fit_distance = fit_distance.map(WireF64);
+        self
+    }
+
+    /// `fit_distance` as a real number for a numeric storage column, if present.
+    pub fn fit_distance_number(&self) -> Option<f64> {
+        self.fit_distance.map(|w| w.0)
     }
 
     /// Numeric JSON for the `components` JSONB column (percentages as real numbers).
@@ -525,13 +542,15 @@ mod tests {
             Some(vec![0.012, -0.044]),
             "2026-06-05T00:00:00Z",
         )
-        .with_biosample_ref(Some("at://x/bs/1".into()));
+        .with_biosample_ref(Some("at://x/bs/1".into()))
+        .with_fit_distance(Some(0.0425));
 
         // Wire: float-free.
         let wire = serde_json::to_value(&rec).unwrap();
         assert_eq!(wire["$type"], NS_POPULATION_BREAKDOWN);
         assert_eq!(wire["analysisMethod"], "PCA_PROJECTION_GMM");
         assert_eq!(wire["confidenceLevel"], "0.97");
+        assert_eq!(wire["fitDistance"], "0.0425"); // string on the wire
         assert_eq!(wire["components"][0]["population"], "Steppe");
         assert_eq!(wire["components"][0]["percentage"], "49"); // string
         assert_eq!(wire["pcaCoordinates"][0], "0.012");
@@ -548,6 +567,7 @@ mod tests {
         assert_eq!(rec.super_population_summary_storage_json()[0]["percentage"], 100.0);
         assert_eq!(rec.pca_coordinates_storage_json().unwrap()[1], -0.044);
         assert_eq!(rec.confidence_level_number(), 0.97);
+        assert_eq!(rec.fit_distance_number(), Some(0.0425));
     }
 
     #[test]
