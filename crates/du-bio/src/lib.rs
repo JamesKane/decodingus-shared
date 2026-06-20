@@ -5,12 +5,14 @@
 //! variant proposals.
 //!
 //! - `callable`: BED interval merge + callable-loci summary (from Navigator BEDs).
+//! - `hash`: shared SHA-256 helpers (byte/reader/file → lowercase hex).
 //! - `liftover`: UCSC chain-file parse + cross-build position liftover.
 //! - `vcf`: VCF variant reader (text) for catalog ingest.
 //! - `ybrowse`: GRCh38 variant ingestion with multi-build liftover.
 
 pub mod callable;
 pub mod error;
+pub mod hash;
 pub mod liftover;
 pub mod vcf;
 pub mod ybrowse;
