@@ -83,7 +83,10 @@ pub fn ed25519_from_did_key(did_key: &str) -> Result<VerifyingKey, AtprotoError>
 pub fn did_key_from_ed25519(vk: &VerifyingKey) -> String {
     let mut bytes = ED25519_PUB_MULTICODEC.to_vec();
     bytes.extend_from_slice(vk.as_bytes());
-    format!("did:key:{}", multibase::encode(multibase::Base::Base58Btc, bytes))
+    format!(
+        "did:key:{}",
+        multibase::encode(multibase::Base::Base58Btc, bytes)
+    )
 }
 
 #[cfg(test)]

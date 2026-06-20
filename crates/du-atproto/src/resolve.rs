@@ -60,9 +60,11 @@ impl DidDocument {
     /// The signing key as a `did:key` (the Multikey `publicKeyMultibase` is the
     /// did:key suffix).
     pub fn signing_did_key(&self) -> Option<String> {
-        self.verification_method
-            .iter()
-            .find_map(|vm| vm.public_key_multibase.as_ref().map(|m| format!("did:key:{m}")))
+        self.verification_method.iter().find_map(|vm| {
+            vm.public_key_multibase
+                .as_ref()
+                .map(|m| format!("did:key:{m}"))
+        })
     }
 }
 
@@ -89,7 +91,14 @@ impl Resolver {
     /// handle -> DID via `https://<handle>/.well-known/atproto-did`.
     pub async fn resolve_handle(&self, handle: &str) -> Result<Did, AtprotoError> {
         let url = format!("https://{handle}/.well-known/atproto-did");
-        let body = self.client.get(url).send().await?.error_for_status()?.text().await?;
+        let body = self
+            .client
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
         Did::parse(body.trim())
     }
 
@@ -171,7 +180,13 @@ mod tests {
 
     #[test]
     fn did_web_url_host_and_path() {
-        assert_eq!(did_web_doc_url("did:web:example.com").unwrap(), "https://example.com/.well-known/did.json");
-        assert_eq!(did_web_doc_url("did:web:example.com:u:alice").unwrap(), "https://example.com/u/alice/did.json");
+        assert_eq!(
+            did_web_doc_url("did:web:example.com").unwrap(),
+            "https://example.com/.well-known/did.json"
+        );
+        assert_eq!(
+            did_web_doc_url("did:web:example.com:u:alice").unwrap(),
+            "https://example.com/u/alice/did.json"
+        );
     }
 }

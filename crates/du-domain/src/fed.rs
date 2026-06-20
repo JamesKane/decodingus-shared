@@ -78,7 +78,9 @@ impl<'de> Deserialize<'de> for WireF64 {
                 Ok(WireF64(v as f64))
             }
             fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<WireF64, E> {
-                v.parse::<f64>().map(WireF64).map_err(|_| E::custom(format!("invalid numeric string: {v}")))
+                v.parse::<f64>()
+                    .map(WireF64)
+                    .map_err(|_| E::custom(format!("invalid numeric string: {v}")))
             }
         }
         d.deserialize_any(V)
@@ -101,7 +103,11 @@ pub struct RecordMeta {
 impl RecordMeta {
     /// A v1 record stamped `created_at` (RFC3339), no update time.
     pub fn v1(created_at: impl Into<String>) -> Self {
-        RecordMeta { version: 1, created_at: created_at.into(), updated_at: None }
+        RecordMeta {
+            version: 1,
+            created_at: created_at.into(),
+            updated_at: None,
+        }
     }
 }
 
@@ -174,7 +180,11 @@ impl AlignmentRecord {
     }
 
     /// Builder: link this record to its biosample and sequence-run records.
-    pub fn with_refs(mut self, biosample_ref: Option<String>, sequence_run_ref: Option<String>) -> Self {
+    pub fn with_refs(
+        mut self,
+        biosample_ref: Option<String>,
+        sequence_run_ref: Option<String>,
+    ) -> Self {
         self.biosample_ref = biosample_ref;
         self.sequence_run_ref = sequence_run_ref;
         self
@@ -192,7 +202,9 @@ pub struct HaplogroupCall {
 
 impl HaplogroupCall {
     pub fn new(name: impl Into<String>) -> Self {
-        HaplogroupCall { haplogroup_name: name.into() }
+        HaplogroupCall {
+            haplogroup_name: name.into(),
+        }
     }
 }
 
@@ -469,12 +481,22 @@ impl PopulationBreakdownRecord {
 
     /// Numeric JSON for the `components` JSONB column (percentages as real numbers).
     pub fn components_storage_json(&self) -> Value {
-        Value::Array(self.components.iter().map(PopulationComponent::storage_json).collect())
+        Value::Array(
+            self.components
+                .iter()
+                .map(PopulationComponent::storage_json)
+                .collect(),
+        )
     }
 
     /// Numeric JSON for the `super_population_summary` JSONB column.
     pub fn super_population_summary_storage_json(&self) -> Value {
-        Value::Array(self.super_population_summary.iter().map(SuperPopulationSummary::storage_json).collect())
+        Value::Array(
+            self.super_population_summary
+                .iter()
+                .map(SuperPopulationSummary::storage_json)
+                .collect(),
+        )
     }
 
     /// Numeric JSON for the `pca_coordinates` JSONB column, if present.
@@ -507,7 +529,16 @@ mod tests {
     #[test]
     fn alignment_wire_shape_no_floats_and_roundtrips() {
         let rec = AlignmentRecord::new(
-            "GRCh38", Some("bwa-mem2".into()), 34.7, 35.0, 6.1, 99.1, 97.8, 94.2, 3_100_000_000, 2_900_000_000,
+            "GRCh38",
+            Some("bwa-mem2".into()),
+            34.7,
+            35.0,
+            6.1,
+            99.1,
+            97.8,
+            94.2,
+            3_100_000_000,
+            2_900_000_000,
             "2026-06-05T00:00:00Z",
         )
         .with_refs(Some("at://x/bs/1".into()), Some("at://x/sr/1".into()));
@@ -534,11 +565,30 @@ mod tests {
             2_000,
             0.97,
             vec![
-                PopulationComponent { population: "Steppe".into(), population_name: None, percentage: 49.0.into(), rank: Some(1) },
-                PopulationComponent { population: "EEF".into(), population_name: Some("Early European Farmer".into()), percentage: 31.0.into(), rank: Some(2) },
-                PopulationComponent { population: "WHG".into(), population_name: Some("Western Hunter-Gatherer".into()), percentage: 20.0.into(), rank: Some(3) },
+                PopulationComponent {
+                    population: "Steppe".into(),
+                    population_name: None,
+                    percentage: 49.0.into(),
+                    rank: Some(1),
+                },
+                PopulationComponent {
+                    population: "EEF".into(),
+                    population_name: Some("Early European Farmer".into()),
+                    percentage: 31.0.into(),
+                    rank: Some(2),
+                },
+                PopulationComponent {
+                    population: "WHG".into(),
+                    population_name: Some("Western Hunter-Gatherer".into()),
+                    percentage: 20.0.into(),
+                    rank: Some(3),
+                },
             ],
-            vec![SuperPopulationSummary { super_population: "EUR".into(), percentage: 100.0.into(), populations: vec!["Steppe".into()] }],
+            vec![SuperPopulationSummary {
+                super_population: "EUR".into(),
+                percentage: 100.0.into(),
+                populations: vec!["Steppe".into()],
+            }],
             Some(vec![0.012, -0.044]),
             "2026-06-05T00:00:00Z",
         )
@@ -564,7 +614,10 @@ mod tests {
         let comps = rec.components_storage_json();
         assert_eq!(comps[0]["percentage"], 49.0);
         assert_eq!(comps[1]["populationName"], "Early European Farmer");
-        assert_eq!(rec.super_population_summary_storage_json()[0]["percentage"], 100.0);
+        assert_eq!(
+            rec.super_population_summary_storage_json()[0]["percentage"],
+            100.0
+        );
         assert_eq!(rec.pca_coordinates_storage_json().unwrap()[1], -0.044);
         assert_eq!(rec.confidence_level_number(), 0.97);
         assert_eq!(rec.fit_distance_number(), Some(0.0425));

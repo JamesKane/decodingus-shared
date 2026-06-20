@@ -30,7 +30,10 @@ pub fn parse<R: BufRead>(reader: R) -> Result<Vec<VcfVariant>, BioError> {
         }
         let f: Vec<&str> = line.split('\t').collect();
         if f.len() < 5 {
-            return Err(BioError::Parse(format!("VCF line {}: fewer than 5 columns", n + 1)));
+            return Err(BioError::Parse(format!(
+                "VCF line {}: fewer than 5 columns",
+                n + 1
+            )));
         }
         let pos = f[1]
             .parse::<i64>()
@@ -51,7 +54,10 @@ fn split_field(s: &str) -> Vec<String> {
     if s == "." || s.is_empty() {
         return Vec::new();
     }
-    s.split([';', ',']).filter(|t| !t.is_empty()).map(str::to_string).collect()
+    s.split([';', ','])
+        .filter(|t| !t.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 #[cfg(test)]

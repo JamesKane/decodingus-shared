@@ -19,7 +19,10 @@ fn pds_url() -> Option<String> {
 }
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -44,12 +47,19 @@ async fn discovery_and_par_against_live_pds() {
         .json()
         .await
         .expect("parse AuthServerMetadata");
-    assert!(meta.issuer.starts_with("https://"), "issuer should be https: {}", meta.issuer);
+    assert!(
+        meta.issuer.starts_with("https://"),
+        "issuer should be https: {}",
+        meta.issuer
+    );
     assert!(
         meta.pushed_authorization_request_endpoint.is_some(),
         "PDS must advertise a PAR endpoint"
     );
-    eprintln!("discovered issuer={} par={:?}", meta.issuer, meta.pushed_authorization_request_endpoint);
+    eprintln!(
+        "discovered issuer={} par={:?}",
+        meta.issuer, meta.pushed_authorization_request_endpoint
+    );
 
     // 2. Build a loopback (public, PKCE-only) client request — the atproto dev
     //    client that needs no hosted client-metadata document.
@@ -60,7 +70,14 @@ async fn discovery_and_par_against_live_pds() {
     );
     let pkce = Pkce::generate();
     let state = du_atproto::oauth::random_token();
-    let form = par_form_public(&client_id, redirect_uri, "atproto", &state, &pkce.challenge, None);
+    let form = par_form_public(
+        &client_id,
+        redirect_uri,
+        "atproto",
+        &state,
+        &pkce.challenge,
+        None,
+    );
 
     // 3. POST the PAR with a DPoP proof, retrying once on a server nonce.
     //    The DPoP `htu` must be the server's CANONICAL endpoint (from metadata),
@@ -70,19 +87,26 @@ async fn discovery_and_par_against_live_pds() {
     let post_to = format!("{pds}/oauth/par");
     let key = EcKey::generate();
     let (status, body, nonce) = post_par(&http, &key, &post_to, &canonical_par, &form, None).await;
-    let (status, body) = if status == 400 && body.get("error").and_then(|e| e.as_str()) == Some("use_dpop_nonce") {
-        let n = nonce.expect("server should supply DPoP-Nonce with use_dpop_nonce");
-        eprintln!("retrying PAR with server DPoP-Nonce");
-        let (s, b, _) = post_par(&http, &key, &post_to, &canonical_par, &form, Some(&n)).await;
-        (s, b)
-    } else {
-        (status, body)
-    };
+    let (status, body) =
+        if status == 400 && body.get("error").and_then(|e| e.as_str()) == Some("use_dpop_nonce") {
+            let n = nonce.expect("server should supply DPoP-Nonce with use_dpop_nonce");
+            eprintln!("retrying PAR with server DPoP-Nonce");
+            let (s, b, _) = post_par(&http, &key, &post_to, &canonical_par, &form, Some(&n)).await;
+            (s, b)
+        } else {
+            (status, body)
+        };
 
     eprintln!("PAR status={status} body={body}");
-    assert!(status.is_success(), "PAR should succeed, got {status}: {body}");
+    assert!(
+        status.is_success(),
+        "PAR should succeed, got {status}: {body}"
+    );
     let request_uri = body.get("request_uri").and_then(|v| v.as_str());
-    assert!(request_uri.is_some(), "PAR response must include request_uri: {body}");
+    assert!(
+        request_uri.is_some(),
+        "PAR response must include request_uri: {body}"
+    );
     eprintln!("✓ PAR accepted; request_uri={}", request_uri.unwrap());
 }
 
@@ -118,7 +142,9 @@ fn urlencoding(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }

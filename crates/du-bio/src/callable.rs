@@ -42,7 +42,11 @@ pub fn summarize_bed(bed: &str) -> Result<Vec<CallableSummary>, BioError> {
     let mut by_contig: BTreeMap<String, Vec<Interval>> = BTreeMap::new();
     for (n, line) in bed.lines().enumerate() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') || line.starts_with("track") || line.starts_with("browser") {
+        if line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with("track")
+            || line.starts_with("browser")
+        {
             continue;
         }
         let mut cols = line.split('\t');
@@ -55,7 +59,10 @@ pub fn summarize_bed(bed: &str) -> Result<Vec<CallableSummary>, BioError> {
             .next()
             .and_then(|s| s.parse::<i64>().ok())
             .ok_or_else(|| BioError::Parse(format!("BED line {}: bad end", n + 1)))?;
-        by_contig.entry(contig.to_string()).or_default().push(Interval { start, end });
+        by_contig
+            .entry(contig.to_string())
+            .or_default()
+            .push(Interval { start, end });
     }
 
     Ok(by_contig
@@ -79,11 +86,17 @@ mod tests {
     fn merges_overlapping_and_adjacent() {
         let m = merge(vec![
             Interval { start: 0, end: 10 },
-            Interval { start: 5, end: 15 },   // overlaps -> merge to [0,15)
-            Interval { start: 15, end: 20 },  // adjacent -> merge to [0,20)
-            Interval { start: 30, end: 40 },  // separate
+            Interval { start: 5, end: 15 }, // overlaps -> merge to [0,15)
+            Interval { start: 15, end: 20 }, // adjacent -> merge to [0,20)
+            Interval { start: 30, end: 40 }, // separate
         ]);
-        assert_eq!(m, vec![Interval { start: 0, end: 20 }, Interval { start: 30, end: 40 }]);
+        assert_eq!(
+            m,
+            vec![
+                Interval { start: 0, end: 20 },
+                Interval { start: 30, end: 40 }
+            ]
+        );
     }
 
     #[test]

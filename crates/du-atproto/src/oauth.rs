@@ -27,14 +27,17 @@ pub struct EcKey {
 
 impl EcKey {
     pub fn generate() -> Self {
-        EcKey { signing: SigningKey::random(&mut rand_core::OsRng) }
+        EcKey {
+            signing: SigningKey::random(&mut rand_core::OsRng),
+        }
     }
 
     pub fn from_base64(s: &str) -> Result<Self, AtprotoError> {
         let bytes = URL_SAFE_NO_PAD
             .decode(s.trim())
             .map_err(|e| AtprotoError::Parse(format!("ec key base64: {e}")))?;
-        let signing = SigningKey::from_slice(&bytes).map_err(|e| AtprotoError::Crypto(e.to_string()))?;
+        let signing =
+            SigningKey::from_slice(&bytes).map_err(|e| AtprotoError::Crypto(e.to_string()))?;
         Ok(EcKey { signing })
     }
 
@@ -102,7 +105,10 @@ impl Pkce {
 
     pub fn from_verifier(verifier: String) -> Self {
         let challenge = b64u(&Sha256::digest(verifier.as_bytes()));
-        Pkce { verifier, challenge }
+        Pkce {
+            verifier,
+            challenge,
+        }
     }
 }
 
@@ -336,7 +342,11 @@ pub fn authorize_url(authorization_endpoint: &str, client_id: &str, request_uri:
         urlencode(client_id),
         urlencode(request_uri)
     );
-    let sep = if authorization_endpoint.contains('?') { '&' } else { '?' };
+    let sep = if authorization_endpoint.contains('?') {
+        '&'
+    } else {
+        '?'
+    };
     format!("{authorization_endpoint}{sep}{q}")
 }
 
@@ -345,7 +355,9 @@ fn urlencode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }
@@ -371,7 +383,12 @@ mod tests {
     #[test]
     fn es256_jws_roundtrips_and_verifies() {
         let key = EcKey::generate();
-        let jwt = client_assertion(&key, "https://app.example/oauth/client-metadata.json", "https://pds.example", 1_700_000_000);
+        let jwt = client_assertion(
+            &key,
+            "https://app.example/oauth/client-metadata.json",
+            "https://pds.example",
+            1_700_000_000,
+        );
         let parts: Vec<&str> = jwt.split('.').collect();
         assert_eq!(parts.len(), 3);
 
@@ -379,19 +396,32 @@ mod tests {
         assert_eq!(header["alg"], "ES256");
         assert_eq!(header["kid"], key.thumbprint());
         let payload = decode_part(parts[1]);
-        assert_eq!(payload["iss"], "https://app.example/oauth/client-metadata.json");
+        assert_eq!(
+            payload["iss"],
+            "https://app.example/oauth/client-metadata.json"
+        );
         assert_eq!(payload["aud"], "https://pds.example");
 
         // signature verifies against the public key over the signing input.
         let signing_input = format!("{}.{}", parts[0], parts[1]);
         let sig = Signature::from_slice(&URL_SAFE_NO_PAD.decode(parts[2]).unwrap()).unwrap();
-        assert!(key.verifying_key().verify(signing_input.as_bytes(), &sig).is_ok());
+        assert!(key
+            .verifying_key()
+            .verify(signing_input.as_bytes(), &sig)
+            .is_ok());
     }
 
     #[test]
     fn dpop_proof_has_jwk_htm_htu_ath() {
         let key = EcKey::generate();
-        let jwt = dpop_proof(&key, "POST", "https://pds.example/xrpc/com.atproto.server.getSession", 1_700_000_000, Some("srvnonce"), Some("access-tok"));
+        let jwt = dpop_proof(
+            &key,
+            "POST",
+            "https://pds.example/xrpc/com.atproto.server.getSession",
+            1_700_000_000,
+            Some("srvnonce"),
+            Some("access-tok"),
+        );
         let parts: Vec<&str> = jwt.split('.').collect();
         let header = decode_part(parts[0]);
         assert_eq!(header["typ"], "dpop+jwt");
@@ -412,24 +442,53 @@ mod tests {
 
     #[test]
     fn public_client_forms_omit_client_assertion() {
-        let par = par_form_public("nav-client", "http://127.0.0.1:0/callback", "atproto", "st8", "chal", Some("alice.test"));
+        let par = par_form_public(
+            "nav-client",
+            "http://127.0.0.1:0/callback",
+            "atproto",
+            "st8",
+            "chal",
+            Some("alice.test"),
+        );
         assert!(par.iter().all(|(k, _)| k != "client_assertion"));
-        assert!(par.iter().any(|(k, v)| k == "code_challenge_method" && v == "S256"));
-        assert!(par.iter().any(|(k, v)| k == "login_hint" && v == "alice.test"));
+        assert!(par
+            .iter()
+            .any(|(k, v)| k == "code_challenge_method" && v == "S256"));
+        assert!(par
+            .iter()
+            .any(|(k, v)| k == "login_hint" && v == "alice.test"));
 
-        let tok = token_form_public("nav-client", "http://127.0.0.1:0/callback", "code123", "verifier");
+        let tok = token_form_public(
+            "nav-client",
+            "http://127.0.0.1:0/callback",
+            "code123",
+            "verifier",
+        );
         assert!(tok.iter().all(|(k, _)| k != "client_assertion"));
-        assert!(tok.iter().any(|(k, v)| k == "grant_type" && v == "authorization_code"));
-        assert!(tok.iter().any(|(k, v)| k == "code_verifier" && v == "verifier"));
+        assert!(tok
+            .iter()
+            .any(|(k, v)| k == "grant_type" && v == "authorization_code"));
+        assert!(tok
+            .iter()
+            .any(|(k, v)| k == "code_verifier" && v == "verifier"));
     }
 
     #[test]
     fn client_metadata_shape() {
-        let m = ClientMetadata::confidential_web("https://decoding-us.com", "atproto transition:generic");
+        let m = ClientMetadata::confidential_web(
+            "https://decoding-us.com",
+            "atproto transition:generic",
+        );
         let v = serde_json::to_value(&m).unwrap();
-        assert_eq!(v["client_id"], "https://decoding-us.com/oauth/client-metadata.json");
+        assert_eq!(
+            v["client_id"],
+            "https://decoding-us.com/oauth/client-metadata.json"
+        );
         assert_eq!(v["token_endpoint_auth_method"], "private_key_jwt");
         assert_eq!(v["dpop_bound_access_tokens"], true);
-        assert_eq!(v["redirect_uris"][0], "https://decoding-us.com/oauth/callback");
+        assert_eq!(
+            v["redirect_uris"][0],
+            "https://decoding-us.com/oauth/callback"
+        );
     }
 }

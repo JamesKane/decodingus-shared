@@ -184,7 +184,11 @@ mod tests {
 
     #[test]
     fn reference_build_roundtrips_through_json() {
-        for b in [ReferenceBuild::GRCh37, ReferenceBuild::GRCh38, ReferenceBuild::Hs1] {
+        for b in [
+            ReferenceBuild::GRCh37,
+            ReferenceBuild::GRCh38,
+            ReferenceBuild::Hs1,
+        ] {
             let s = serde_json::to_string(&b).unwrap();
             let back: ReferenceBuild = serde_json::from_str(&s).unwrap();
             assert_eq!(b, back);
