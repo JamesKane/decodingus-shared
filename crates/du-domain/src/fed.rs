@@ -32,6 +32,8 @@ pub const NS_POPULATION_BREAKDOWN: &str = "com.decodingus.atmosphere.populationB
 /// Donor-level multi-run haplogroup reconciliation (defined for completeness; its
 /// full payload lives with the reconciliation feature).
 pub const NS_HAPLOGROUP_RECONCILIATION: &str = "com.decodingus.atmosphere.haplogroupReconciliation";
+/// Federated community feed post (public text + optional topic/reply — PII-free).
+pub const NS_FEED_POST: &str = "com.decodingus.atmosphere.feed.post";
 
 // ── float-as-string wire scalar ─────────────────────────────────────────────────
 
@@ -512,6 +514,82 @@ impl PopulationBreakdownRecord {
     }
 }
 
+// ── community feed post ──────────────────────────────────────────────────────────
+
+/// A strongRef-style pointer to another post (`{ uri }`). The AppView's feed mirror
+/// reads `reply.{root,parent}.uri`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PostRef {
+    pub uri: String,
+}
+
+impl PostRef {
+    pub fn new(uri: impl Into<String>) -> Self {
+        PostRef { uri: uri.into() }
+    }
+}
+
+/// The reply block on a threaded post: the thread `root` and the immediate `parent`
+/// (atproto reply convention). Both are required when present.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplyRef {
+    pub root: PostRef,
+    pub parent: PostRef,
+}
+
+/// A federated community feed post (`com.decodingus.atmosphere.feed.post`). PII-free —
+/// a public DID, the post text, an optional topic, and (on replies) thread pointers.
+///
+/// Unlike the genomic summary records, the timestamp is the **top-level** `createdAt`
+/// (the AppView's feed mirror reads it there, not `meta.createdAt`), and there are no
+/// floats, so no [`WireF64`] / storage-JSON projection is needed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedPostRecord {
+    #[serde(rename = "$type")]
+    pub record_type: String,
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply: Option<ReplyRef>,
+    pub created_at: String,
+}
+
+impl FeedPostRecord {
+    /// A top-level post stamped `created_at` (RFC3339).
+    pub fn new(text: impl Into<String>, created_at: impl Into<String>) -> Self {
+        FeedPostRecord {
+            record_type: NS_FEED_POST.to_string(),
+            text: text.into(),
+            topic: None,
+            reply: None,
+            created_at: created_at.into(),
+        }
+    }
+
+    /// Builder: tag the post with a topic (e.g. `"haplogroup:R-M269"`). A blank/`None`
+    /// topic is dropped (the field is skipped on the wire).
+    pub fn with_topic(mut self, topic: Option<String>) -> Self {
+        self.topic = topic.filter(|t| !t.trim().is_empty());
+        self
+    }
+
+    /// Builder: make this a reply, pointing at the thread `root` and immediate `parent`
+    /// post at-URIs.
+    pub fn with_reply(
+        mut self,
+        root_uri: impl Into<String>,
+        parent_uri: impl Into<String>,
+    ) -> Self {
+        self.reply = Some(ReplyRef {
+            root: PostRef::new(root_uri),
+            parent: PostRef::new(parent_uri),
+        });
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -653,5 +731,32 @@ mod tests {
         assert!(v.get("accession").is_none() && v.get("description").is_none());
         let back: BiosampleRecord = serde_json::from_value(v).unwrap();
         assert_eq!(back, rec);
+    }
+
+    #[test]
+    fn feed_post_wire_shape_matches_appview_contract() {
+        // Top-level post: text + topic, top-level createdAt, no reply block.
+        let rec = FeedPostRecord::new("Anyone else R-M269 from Ireland?", "2026-06-19T12:00:00Z")
+            .with_topic(Some("haplogroup:R-M269".into()));
+        let v = serde_json::to_value(&rec).unwrap();
+        assert_eq!(v["$type"], NS_FEED_POST);
+        assert_eq!(v["text"], "Anyone else R-M269 from Ireland?");
+        assert_eq!(v["topic"], "haplogroup:R-M269");
+        assert_eq!(v["createdAt"], "2026-06-19T12:00:00Z"); // top-level, not meta.createdAt
+        assert!(v.get("meta").is_none() && v.get("reply").is_none());
+        assert_no_floats(&v);
+        let back: FeedPostRecord = serde_json::from_value(v).unwrap();
+        assert_eq!(back, rec);
+
+        // Reply: carries reply.{root,parent}.uri the AppView mirror reads; a blank topic is dropped.
+        let reply = FeedPostRecord::new("me too", "2026-06-19T13:00:00Z")
+            .with_topic(Some("   ".into()))
+            .with_reply("at://x/p/root", "at://x/p/par");
+        let rv = serde_json::to_value(&reply).unwrap();
+        assert!(rv.get("topic").is_none()); // blank topic skipped
+        assert_eq!(rv["reply"]["root"]["uri"], "at://x/p/root");
+        assert_eq!(rv["reply"]["parent"]["uri"], "at://x/p/par");
+        let rback: FeedPostRecord = serde_json::from_value(rv).unwrap();
+        assert_eq!(rback, reply);
     }
 }
