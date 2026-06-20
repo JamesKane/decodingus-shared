@@ -133,7 +133,11 @@ struct Index<'a> {
 
 impl<'a> Index<'a> {
     fn build(roots: &'a [ExistingNode]) -> Self {
-        let mut idx = Index { by_id: BTreeMap::new(), defining: BTreeMap::new(), subtree: BTreeMap::new() };
+        let mut idx = Index {
+            by_id: BTreeMap::new(),
+            defining: BTreeMap::new(),
+            subtree: BTreeMap::new(),
+        };
         for r in roots {
             idx.walk(r);
         }
@@ -143,7 +147,8 @@ impl<'a> Index<'a> {
     /// Populate maps; returns the subtree-id set of `node` (incl. self).
     fn walk(&mut self, node: &'a ExistingNode) -> BTreeSet<i64> {
         self.by_id.insert(node.id, node);
-        self.defining.insert(node.id, node.variants.iter().cloned().collect());
+        self.defining
+            .insert(node.id, node.variants.iter().cloned().collect());
         let mut sub = BTreeSet::new();
         sub.insert(node.id);
         for c in &node.children {
@@ -179,8 +184,16 @@ enum MatchResult {
 fn classify(vs: &BTreeSet<String>, name: &str, scope: &BTreeSet<i64>, idx: &Index) -> MatchResult {
     // Unnamed/variant-less intermediate: fall back to a name match in scope.
     if vs.is_empty() {
-        let by_name: Vec<i64> = scope.iter().copied().filter(|id| idx.by_id[id].name == name).collect();
-        return if by_name.len() == 1 { MatchResult::Full(by_name[0]) } else { MatchResult::New };
+        let by_name: Vec<i64> = scope
+            .iter()
+            .copied()
+            .filter(|id| idx.by_id[id].name == name)
+            .collect();
+        return if by_name.len() == 1 {
+            MatchResult::Full(by_name[0])
+        } else {
+            MatchResult::New
+        };
     }
 
     let candidates: Vec<i64> = scope
@@ -189,7 +202,11 @@ fn classify(vs: &BTreeSet<String>, name: &str, scope: &BTreeSet<i64>, idx: &Inde
         .filter(|id| !idx.defining[id].is_disjoint(vs))
         .collect();
 
-    let exact: Vec<i64> = candidates.iter().copied().filter(|id| idx.defining[id] == *vs).collect();
+    let exact: Vec<i64> = candidates
+        .iter()
+        .copied()
+        .filter(|id| idx.defining[id] == *vs)
+        .collect();
     match exact.len() {
         1 => return MatchResult::Full(exact[0]),
         n if n > 1 => return MatchResult::Ambiguous(AmbiguityKind::MultipleCandidates, exact),
@@ -221,7 +238,11 @@ struct Planner<'a> {
 
 impl<'a> Planner<'a> {
     fn new(idx: Index<'a>) -> Self {
-        Planner { idx, plan: MergePlan::default(), next_placeholder: -1 }
+        Planner {
+            idx,
+            plan: MergePlan::default(),
+            next_placeholder: -1,
+        }
     }
 
     fn placeholder(&mut self) -> i32 {
@@ -233,18 +254,32 @@ impl<'a> Planner<'a> {
     /// Create a node under `parent`, returning its placeholder ref.
     fn create(&mut self, name: &str, parent: NodeRef, variants: Vec<String>) -> NodeRef {
         let placeholder = self.placeholder();
-        self.plan.ops.push(MergeOp::CreateNode { placeholder, name: name.to_string(), parent, variants });
+        self.plan.ops.push(MergeOp::CreateNode {
+            placeholder,
+            name: name.to_string(),
+            parent,
+            variants,
+        });
         self.plan.stats.created += 1;
         NodeRef::New(placeholder)
     }
 
-    fn visit(&mut self, source: &SourceNode, parent: NodeRef, scope: BTreeSet<i64>, source_name: &str) {
+    fn visit(
+        &mut self,
+        source: &SourceNode,
+        parent: NodeRef,
+        scope: BTreeSet<i64>,
+        source_name: &str,
+    ) {
         self.plan.stats.processed += 1;
         let vs: BTreeSet<String> = source.variants.iter().cloned().collect();
 
         match classify(&vs, &source.name, &scope, &self.idx) {
             MatchResult::Full(e) => {
-                self.plan.ops.push(MergeOp::MatchMetadata { node: e, source: source_name.to_string() });
+                self.plan.ops.push(MergeOp::MatchMetadata {
+                    node: e,
+                    source: source_name.to_string(),
+                });
                 self.plan.stats.matched += 1;
                 let child_scope = self.idx.strict_descendants(e);
                 for c in &source.children {
@@ -255,10 +290,17 @@ impl<'a> Planner<'a> {
                 // Source is a coarser ancestor of E: insert it above E, move E
                 // under it, and downflow the shared variants off E.
                 let new_ref = self.create(&source.name, parent, source.variants.clone());
-                self.plan.ops.push(MergeOp::Reparent { node: e, new_parent: new_ref });
+                self.plan.ops.push(MergeOp::Reparent {
+                    node: e,
+                    new_parent: new_ref,
+                });
                 let shared: Vec<String> = vs.iter().cloned().collect();
                 if !shared.is_empty() {
-                    self.plan.ops.push(MergeOp::EditVariants { node: e, add: vec![], remove: shared });
+                    self.plan.ops.push(MergeOp::EditVariants {
+                        node: e,
+                        add: vec![],
+                        remove: shared,
+                    });
                 }
                 self.plan.stats.contracted += 1;
                 // E now sits under the new node; deeper source nodes match E or
@@ -274,7 +316,12 @@ impl<'a> Planner<'a> {
                 // SNPs. (Conservative: we do not pull E's existing children into
                 // the new node — that restructuring is left to a curator.)
                 let ue = &self.idx.defining[&e];
-                let extra: Vec<String> = source.variants.iter().filter(|v| !ue.contains(*v)).cloned().collect();
+                let extra: Vec<String> = source
+                    .variants
+                    .iter()
+                    .filter(|v| !ue.contains(*v))
+                    .cloned()
+                    .collect();
                 let new_ref = self.create(&source.name, NodeRef::Existing(e), extra);
                 for c in &source.children {
                     self.visit(c, new_ref, BTreeSet::new(), source_name);
@@ -306,7 +353,11 @@ impl<'a> Planner<'a> {
 }
 
 /// Merge a source tree into the existing tree, producing a reviewable plan.
-pub fn merge(existing_roots: &[ExistingNode], source_roots: &[SourceNode], source_name: &str) -> MergePlan {
+pub fn merge(
+    existing_roots: &[ExistingNode],
+    source_roots: &[SourceNode],
+    source_name: &str,
+) -> MergePlan {
     let idx = Index::build(existing_roots);
     let all = idx.all_ids();
     let mut planner = Planner::new(idx);
@@ -321,16 +372,28 @@ mod tests {
     use super::*;
 
     fn ex(id: i64, name: &str, vars: &[&str], children: Vec<ExistingNode>) -> ExistingNode {
-        ExistingNode { id, name: name.into(), variants: vars.iter().map(|s| s.to_string()).collect(), children }
+        ExistingNode {
+            id,
+            name: name.into(),
+            variants: vars.iter().map(|s| s.to_string()).collect(),
+            children,
+        }
     }
     fn src(name: &str, vars: &[&str], children: Vec<SourceNode>) -> SourceNode {
-        SourceNode { name: name.into(), variants: vars.iter().map(|s| s.to_string()).collect(), children }
+        SourceNode {
+            name: name.into(),
+            variants: vars.iter().map(|s| s.to_string()).collect(),
+            children,
+        }
     }
     fn creates(p: &MergePlan) -> Vec<&str> {
-        p.ops.iter().filter_map(|o| match o {
-            MergeOp::CreateNode { name, .. } => Some(name.as_str()),
-            _ => None,
-        }).collect()
+        p.ops
+            .iter()
+            .filter_map(|o| match o {
+                MergeOp::CreateNode { name, .. } => Some(name.as_str()),
+                _ => None,
+            })
+            .collect()
     }
 
     #[test]
@@ -339,23 +402,47 @@ mod tests {
         let existing = vec![ex(1, "R", &["M207"], vec![ex(2, "R1b", &["M343"], vec![])])];
         let source = vec![src("R", &["M207"], vec![src("R1b", &["M343"], vec![])])];
         let plan = merge(&existing, &source, "ISOGG");
-        assert!(creates(&plan).is_empty(), "no new nodes for an identical tree");
+        assert!(
+            creates(&plan).is_empty(),
+            "no new nodes for an identical tree"
+        );
         assert!(plan.ambiguities.is_empty());
         assert_eq!(plan.stats.matched, 2);
         // both nodes matched 1:1
-        assert_eq!(plan.ops.iter().filter(|o| matches!(o, MergeOp::MatchMetadata { .. })).count(), 2);
+        assert_eq!(
+            plan.ops
+                .iter()
+                .filter(|o| matches!(o, MergeOp::MatchMetadata { .. }))
+                .count(),
+            2
+        );
     }
 
     #[test]
     fn pure_extension_adds_a_leaf() {
         // source adds R1b-L21 under the existing R1b.
         let existing = vec![ex(1, "R", &["M207"], vec![ex(2, "R1b", &["M343"], vec![])])];
-        let source = vec![src("R", &["M207"], vec![src("R1b", &["M343"], vec![src("R1b-L21", &["L21"], vec![])])])];
+        let source = vec![src(
+            "R",
+            &["M207"],
+            vec![src(
+                "R1b",
+                &["M343"],
+                vec![src("R1b-L21", &["L21"], vec![])],
+            )],
+        )];
         let plan = merge(&existing, &source, "ISOGG");
         assert_eq!(creates(&plan), vec!["R1b-L21"]);
         // attached under the existing R1b (id 2)
-        match plan.ops.iter().find(|o| matches!(o, MergeOp::CreateNode { .. })).unwrap() {
-            MergeOp::CreateNode { parent, variants, .. } => {
+        match plan
+            .ops
+            .iter()
+            .find(|o| matches!(o, MergeOp::CreateNode { .. }))
+            .unwrap()
+        {
+            MergeOp::CreateNode {
+                parent, variants, ..
+            } => {
                 assert_eq!(*parent, NodeRef::Existing(2));
                 assert_eq!(variants, &vec!["L21".to_string()]);
             }
@@ -369,7 +456,12 @@ mod tests {
         // Existing lumps three SNPs on one node; source splits the top one out.
         //   existing:  R(M207) -> RC(M343,L23,L51)
         //   source:    R(M207) -> R1b(M343) -> [deeper handled separately]
-        let existing = vec![ex(1, "R", &["M207"], vec![ex(2, "RC", &["M343", "L23", "L51"], vec![])])];
+        let existing = vec![ex(
+            1,
+            "R",
+            &["M207"],
+            vec![ex(2, "RC", &["M343", "L23", "L51"], vec![])],
+        )];
         let source = vec![src("R", &["M207"], vec![src("R1b", &["M343"], vec![])])];
         let plan = merge(&existing, &source, "ISOGG");
 
@@ -378,10 +470,18 @@ mod tests {
         assert_eq!(plan.stats.contracted, 1);
         // New node attaches under R (id 1); RC (id 2) reparented under the new
         // node; M343 downflowed off RC.
-        let create = plan.ops.iter().find_map(|o| match o {
-            MergeOp::CreateNode { placeholder, parent, .. } => Some((*placeholder, *parent)),
-            _ => None,
-        }).unwrap();
+        let create = plan
+            .ops
+            .iter()
+            .find_map(|o| match o {
+                MergeOp::CreateNode {
+                    placeholder,
+                    parent,
+                    ..
+                } => Some((*placeholder, *parent)),
+                _ => None,
+            })
+            .unwrap();
         assert_eq!(create.1, NodeRef::Existing(1));
         assert!(plan.ops.iter().any(|o| matches!(o, MergeOp::Reparent { node: 2, new_parent } if *new_parent == NodeRef::New(create.0))));
         assert!(plan.ops.iter().any(|o| matches!(o, MergeOp::EditVariants { node: 2, remove, .. } if remove == &vec!["M343".to_string()])));
@@ -397,13 +497,25 @@ mod tests {
             ex(1, "R", &["M207"], vec![ex(2, "R1b", &["M343"], vec![])]),
             ex(3, "I", &["M170"], vec![ex(4, "I-L21", &["L21"], vec![])]),
         ];
-        let source = vec![src("R", &["M207"], vec![src("R1b", &["M343"], vec![src("R-L21", &["L21"], vec![])])])];
+        let source = vec![src(
+            "R",
+            &["M207"],
+            vec![src("R1b", &["M343"], vec![src("R-L21", &["L21"], vec![])])],
+        )];
         let plan = merge(&existing, &source, "ISOGG");
         assert_eq!(creates(&plan), vec!["R-L21"]);
         // created under R1b (id 2), and the I-lineage node (id 4) is untouched.
-        assert!(plan.ops.iter().any(|o| matches!(o, MergeOp::CreateNode { parent, .. } if *parent == NodeRef::Existing(2))));
-        assert!(!plan.ops.iter().any(|o| matches!(o, MergeOp::Reparent { node: 4, .. })));
-        assert!(plan.ambiguities.is_empty(), "scoping resolves it cleanly, no ambiguity");
+        assert!(plan.ops.iter().any(
+            |o| matches!(o, MergeOp::CreateNode { parent, .. } if *parent == NodeRef::Existing(2))
+        ));
+        assert!(!plan
+            .ops
+            .iter()
+            .any(|o| matches!(o, MergeOp::Reparent { node: 4, .. })));
+        assert!(
+            plan.ambiguities.is_empty(),
+            "scoping resolves it cleanly, no ambiguity"
+        );
     }
 
     #[test]
@@ -425,16 +537,29 @@ mod tests {
         // Source adds a two-deep new subtree; the deeper node attaches to the
         // shallower one's placeholder.
         let existing = vec![ex(1, "R", &["M207"], vec![])];
-        let source = vec![src("R", &["M207"], vec![src("A", &["a1"], vec![src("B", &["b1"], vec![])])])];
+        let source = vec![src(
+            "R",
+            &["M207"],
+            vec![src("A", &["a1"], vec![src("B", &["b1"], vec![])])],
+        )];
         let plan = merge(&existing, &source, "ISOGG");
         assert_eq!(creates(&plan), vec!["A", "B"]);
-        let a_ph = plan.ops.iter().find_map(|o| match o {
-            MergeOp::CreateNode { placeholder, name, parent, .. } if name == "A" => {
-                assert_eq!(*parent, NodeRef::Existing(1));
-                Some(*placeholder)
-            }
-            _ => None,
-        }).unwrap();
+        let a_ph = plan
+            .ops
+            .iter()
+            .find_map(|o| match o {
+                MergeOp::CreateNode {
+                    placeholder,
+                    name,
+                    parent,
+                    ..
+                } if name == "A" => {
+                    assert_eq!(*parent, NodeRef::Existing(1));
+                    Some(*placeholder)
+                }
+                _ => None,
+            })
+            .unwrap();
         // B attaches under A's placeholder.
         assert!(plan.ops.iter().any(|o| matches!(o, MergeOp::CreateNode { name, parent, .. } if name == "B" && *parent == NodeRef::New(a_ph))));
     }

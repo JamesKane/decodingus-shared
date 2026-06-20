@@ -37,7 +37,11 @@ impl Chain {
         for b in &self.blocks {
             if t_pos >= t && t_pos < t + b.size {
                 let q_pos = q + (t_pos - t);
-                return Some(if self.q_strand == '-' { self.q_size - 1 - q_pos } else { q_pos });
+                return Some(if self.q_strand == '-' {
+                    self.q_size - 1 - q_pos
+                } else {
+                    q_pos
+                });
             }
             t += b.size + b.dt;
             q += b.size + b.dq;
@@ -70,10 +74,15 @@ impl Liftover {
                     chains.push(c);
                 }
                 if tok.len() < 12 {
-                    return Err(BioError::Parse(format!("chain header line {}: too few fields", n + 1)));
+                    return Err(BioError::Parse(format!(
+                        "chain header line {}: too few fields",
+                        n + 1
+                    )));
                 }
                 let p = |i: usize| -> Result<i64, BioError> {
-                    tok[i].parse().map_err(|_| BioError::Parse(format!("chain line {}: bad int", n + 1)))
+                    tok[i]
+                        .parse()
+                        .map_err(|_| BioError::Parse(format!("chain line {}: bad int", n + 1)))
                 };
                 current = Some(Chain {
                     t_name: tok[2].to_string(),
@@ -85,14 +94,27 @@ impl Liftover {
                     blocks: Vec::new(),
                 });
             } else {
-                let c = current
-                    .as_mut()
-                    .ok_or_else(|| BioError::Parse(format!("block line {} before chain header", n + 1)))?;
+                let c = current.as_mut().ok_or_else(|| {
+                    BioError::Parse(format!("block line {} before chain header", n + 1))
+                })?;
                 let nums: Vec<i64> = tok.iter().filter_map(|s| s.parse().ok()).collect();
                 let block = match nums.len() {
-                    1 => Block { size: nums[0], dt: 0, dq: 0 },
-                    3 => Block { size: nums[0], dt: nums[1], dq: nums[2] },
-                    _ => return Err(BioError::Parse(format!("block line {}: expected 1 or 3 ints", n + 1))),
+                    1 => Block {
+                        size: nums[0],
+                        dt: 0,
+                        dq: 0,
+                    },
+                    3 => Block {
+                        size: nums[0],
+                        dt: nums[1],
+                        dq: nums[2],
+                    },
+                    _ => {
+                        return Err(BioError::Parse(format!(
+                            "block line {}: expected 1 or 3 ints",
+                            n + 1
+                        )))
+                    }
                 };
                 c.blocks.push(block);
             }

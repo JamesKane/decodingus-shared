@@ -11,3 +11,4 @@ license.workspace = true
 [dependencies]
 du-domain = { workspace = true }
 thiserror = { workspace = true }
+sha2 = { workspace = true }

@@ -11,14 +11,19 @@ use ed25519_dalek::Signature;
 
 /// Verify that `signature_b64` (standard base64 of a 64-byte Ed25519 signature)
 /// over `message` was produced by the key in `did_key` (`did:key:z...`).
-pub fn verify_did_key(did_key: &str, message: &[u8], signature_b64: &str) -> Result<(), AtprotoError> {
+pub fn verify_did_key(
+    did_key: &str,
+    message: &[u8],
+    signature_b64: &str,
+) -> Result<(), AtprotoError> {
     let vk = ed25519_from_did_key(did_key)?;
     let sig_bytes = STANDARD
         .decode(signature_b64.trim())
         .map_err(|e| AtprotoError::Parse(format!("signature base64: {e}")))?;
     let sig = Signature::from_slice(&sig_bytes)
         .map_err(|e| AtprotoError::Parse(format!("signature bytes: {e}")))?;
-    vk.verify_strict(message, &sig).map_err(|_| AtprotoError::BadSignature)
+    vk.verify_strict(message, &sig)
+        .map_err(|_| AtprotoError::BadSignature)
 }
 
 #[cfg(test)]
